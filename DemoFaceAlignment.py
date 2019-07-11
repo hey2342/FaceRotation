@@ -1,42 +1,46 @@
 # coding: utf-8
 
-import face_alignment, cv2, os, sys
+import face_alignment, cv2, os, sys, copy
 from skimage import io
 import numpy as np
 
 
-fa = face_alignment.FaceAlignment(face_alignment.LandmarksType._2D, flip_input=False)
 set_interval = 5
 
 def face_detection(video_dir, dimflag='2d'):
-    video_name = os.path.basename(video_dir)[:-3]   #file name
+    video_name = os.path.basename(video_dir)[:-4]
     print('=====load video=====')
-    video = cv2.VideoCapture('./video/' + video_dir)        #video obj 
-    width = int(video.get(3))             #video width
-    height = int(video.get(4))            #video height
-    fps = video.get(5)                    #video fps
+    video = cv2.VideoCapture(video_dir) 
+    width = int(video.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(video.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    fps = video.get(cv2.CAP_PROP_FPS)
     fourcc = cv2.VideoWriter_fourcc('M', 'P', '4', 'V')
     print('=====build output file=====')
     if dimflag == '2d':
-        video_out = cv2.VideoWriter('./detected/' + video_name + 'mp4', fourcc, fps, (width, height)) #2d_output
-        face_out = cv2.VideoWriter('./detected/' + video_name[:-1] + '_face.mp4', fourcc, fps, (320, 320)) #face_output
+        fa = face_alignment.FaceAlignment(face_alignment.LandmarksType._2D, flip_input=False)
+        video_out = cv2.VideoWriter('./detected/' + video_name + '.mp4', fourcc, fps, (width, height)) #2d_output
+        face_out = cv2.VideoWriter('./detected/' + video_name + '_face.mp4', fourcc, fps, (320, 320)) #face_output
+        lmark_out = cv2.VideoWriter('./detected/' + video_name + '_lmark.mp4', fourcc, fps, (width, height)) #landmark
     elif dimflag == '3d':
-        video_out = cv2.VideoWriter('./detected_3d/' + video_name + 'mp4', fourcc, fps, (width, height)) #3d_output
-        face_out = cv2.VideoWriter('./detected_3d/' + video_name[:-1] + '_face.mp4', fourcc, fps, (320, 320)) #face_output
+        fa = face_alignment.FaceAlignment(face_alignment.LandmarksType._3D, flip_input=False)
+        video_out = cv2.VideoWriter('./detected_3d/' + video_name + '.mp4', fourcc, fps, (width, height)) #3d_output
+        face_out = cv2.VideoWriter('./detected_3d/' + video_name + '_face.mp4', fourcc, fps, (320, 320)) #face_output
+        lmark_out = cv2.VideoWriter('./detected_3d/' + video_name + '_lmark.mp4', fourcc, fps, (width, height)) #landmark
     else:
-        print('#####3d key error#####')
+        print('#####dimention key error#####')
 
     i = -1
     print('=====start face detection======')
-    before_lu = np.array([width, height])
+    before_lu = np.array([width-1, height-1])
     before_rd = np.array([width, height])
+    pred_landmarks = []
     while(video.isOpened()):
         ret, frame = video.read()
         i+=1
         if i % set_interval != 0:
             continue
         if ret == True:
-            preds = face_landmark(frame)
+            preds = face_landmark(fa, frame)
             lu, rd = face_box(frame, preds)
             save_face = []
             for j in range(len(lu)):
@@ -57,24 +61,38 @@ def face_detection(video_dir, dimflag='2d'):
             if len(preds) == 0:
                 save_face = cv2.resize(frame[before_lu[1]:before_rd[1], before_lu[0]:before_rd[0]], (320, 320))
 
-            print(i, before_lu, before_rd)
-            face_out.write(save_face)
-            image = plot_alignment(frame, preds)
+            #cv2.imwrite('./video/lmark_' + str(i) + '.jpg', lmark_img)
             #if i%500 == 0:
                 #if dimflag == '2d':
                     #save_image(image, i)
                 #else:
                     #save_image(image, i, '3d')
+
+            new_img = copy.copy(frame)
+            lmark_img = plot_alignment(new_img, preds)
+         
             video_out.write(image)
+            face_out.write(save_face)
+            lmark_out.write(lmark_img)
+            pred_landmarks.append(preds)
         else:
             break
     video.release()
     video_out.release()
     face_out.release()
+    lmark_out.release()
+    if dimflag == '2d':
+        np.save('./detected/' + video_name, np.array(pred_landmarks))
+    elif dimflag == '3d':
+        np.save('./detected_3d/' + video_name, np.array(pred_landmarks))
+    else:
+        print('#####dimention key error#####')
+
+
     print('=====finish all=====')
         
-def face_landmark(image):
-    preds = fa.get_landmarks(image)
+def face_landmark(f_alignment, image):
+    preds = f_alignment.get_landmarks(image)
     if preds == None:
         preds = []
     return  np.array(preds)
