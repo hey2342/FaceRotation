@@ -19,47 +19,48 @@ def face_detection(video_dir, dimflag='2d'):
     if dimflag == '2d':
         fa = face_alignment.FaceAlignment(face_alignment.LandmarksType._2D, flip_input=False)
         video_out = cv2.VideoWriter('./detected/' + video_name + '.mp4', fourcc, fps, (width, height)) #2d_output
-        face_out = cv2.VideoWriter('./detected/' + video_name + '_face.mp4', fourcc, fps, (320, 320)) #face_output
+        #face_out = cv2.VideoWriter('./detected/' + video_name + '_face.mp4', fourcc, fps, (320, 320)) #face_output
         lmark_out = cv2.VideoWriter('./detected/' + video_name + '_lmark.mp4', fourcc, fps, (width, height)) #landmark
     elif dimflag == '3d':
         fa = face_alignment.FaceAlignment(face_alignment.LandmarksType._3D, flip_input=False)
         video_out = cv2.VideoWriter('./detected_3d/' + video_name + '.mp4', fourcc, fps, (width, height)) #3d_output
-        face_out = cv2.VideoWriter('./detected_3d/' + video_name + '_face.mp4', fourcc, fps, (320, 320)) #face_output
+        #face_out = cv2.VideoWriter('./detected_3d/' + video_name + '_face.mp4', fourcc, fps, (320, 320)) #face_output
         lmark_out = cv2.VideoWriter('./detected_3d/' + video_name + '_lmark.mp4', fourcc, fps, (width, height)) #landmark
     else:
         print('#####dimention key error#####')
 
     i = -1
     print('=====start face detection======')
-    before_lu = np.array([width-1, height-1])
-    before_rd = np.array([width, height])
+    #before_lu = np.array([width-1, height-1])
+    #before_rd = np.array([width, height])
     pred_landmarks = []
     while(video.isOpened()):
         ret, frame = video.read()
         i+=1
         if i % set_interval != 0:
             continue
-        if ret == True:
+        print('frame : ' + str(i))
+        if ret:
             preds = face_landmark(fa, frame)
-            lu, rd = face_box(frame, preds)
-            save_face = []
-            for j in range(len(lu)):
+            #lu, rd = face_box(frame, preds)
+            #save_face = []
+            #for j in range(len(lu)):
                 #save_image(frame[lu[j][1]:rd[j][1], lu[j][0]:rd[j][0]], str(i)+'_'+str(j))
-                if i == 0:
-                    if lu[j][0] < before_lu[0]:
-                        save_face = cv2.resize(frame[lu[j][1]:rd[j][1], lu[j][0]:rd[j][0]], (320, 320))
-                        before_lu = lu[j]
-                        before_rd = rd[j]
-                else:
-                    if np.linalg.norm(before_lu - lu[j]) < 50:
-                        save_face = cv2.resize(frame[lu[j][1]:rd[j][1], lu[j][0]:rd[j][0]], (320, 320))
-                        before_lu = lu[j]
-                        before_rd = rd[j]
-                        break
-                    else:
-                        save_face = cv2.resize(frame[before_lu[1]:before_rd[1], before_lu[0]:before_rd[0]], (320, 320))
-            if len(preds) == 0:
-                save_face = cv2.resize(frame[before_lu[1]:before_rd[1], before_lu[0]:before_rd[0]], (320, 320))
+                #if i == 0:
+                    #if lu[j][0] < before_lu[0]:
+                        #save_face = cv2.resize(frame[lu[j][1]:rd[j][1], lu[j][0]:rd[j][0]], (320, 320))
+                        #before_lu = lu[j]
+                        #before_rd = rd[j]
+                #else:
+                    #if np.linalg.norm(before_lu - lu[j]) < 50:
+                        #save_face = cv2.resize(frame[lu[j][1]:rd[j][1], lu[j][0]:rd[j][0]], (320, 320))
+                        #before_lu = lu[j]
+                        #before_rd = rd[j]
+                        #break
+                    #else:
+                        #save_face = cv2.resize(frame[before_lu[1]:before_rd[1], before_lu[0]:before_rd[0]], (320, 320))
+            #if len(preds) == 0:
+                #save_face = cv2.resize(frame[before_lu[1]:before_rd[1], before_lu[0]:before_rd[0]], (320, 320))
 
             #cv2.imwrite('./video/lmark_' + str(i) + '.jpg', lmark_img)
             #if i%500 == 0:
@@ -71,20 +72,24 @@ def face_detection(video_dir, dimflag='2d'):
             new_img = copy.copy(frame)
             lmark_img = plot_alignment(new_img, preds)
          
-            video_out.write(image)
-            face_out.write(save_face)
+            video_out.write(frame)
+            #face_out.write(save_face)
             lmark_out.write(lmark_img)
             pred_landmarks.append(preds)
         else:
             break
+        #if i % 5000 == 0:
+            #print('save : ' + str(i).zfill(5))
+            #np.save('./detected_3d/' + video_name + '_' + str(i).zfill(5), np.array(pred_landmarks))
+            #pred_landmarks = []
     video.release()
     video_out.release()
-    face_out.release()
+    #face_out.release()
     lmark_out.release()
     if dimflag == '2d':
         np.save('./detected/' + video_name, np.array(pred_landmarks))
     elif dimflag == '3d':
-        np.save('./detected_3d/' + video_name, np.array(pred_landmarks))
+        np.save('./detected_3d/' + video_name + '_' + str(i).zfill(5), np.array(pred_landmarks))
     else:
         print('#####dimention key error#####')
 

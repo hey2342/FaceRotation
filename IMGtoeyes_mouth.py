@@ -1,69 +1,66 @@
 #coding: utf-8
 
-import face_alignment, cv2, os, sys
+import face_alignment, cv2, os, sys, copy
 import numpy as np
 from rotation_lmark import rotation_lmark
+from FaceNormalization import img_normalization
 
-MODE = sys.argv[1] #Train or Test
-
-DATA_DIR = './MUGdataset/'
-IN_DIR = DATA_DIR + MODE +  '/'
-REYE_DIR = DATA_DIR + MODE + '_reye/'
-LEYE_DIR = DATA_DIR + MODE + '_leye/'
-MOUTH_DIR = DATA_DIR + MODE + '_mouth/'
-
-EYE_SIZE = [128, 64]
-MOUTH_SIZE = [256, 128]
-
-def lmark_bbox(lmark, pos = 'eye'):
-    center = [sum(lmark[:,0])/len(lmark), sum(lmark[:,1])/len(lmark)]
-    half_eye = [EYE_SIZE[0]/2, EYE_SIZE[1]/2]
-    half_mouth = [MOUTH_SIZE[0]/2, MOUTH_SIZE[1]/2]
-    if pos == 'eye':
-        up_left = [int(center[1]-half_eye[1]), int(center[0]-half_eye[0])]
-        down_right = [int(center[1]+half_eye[1]), int(center[0]+half_eye[0])]
-    if pos == 'mouth':
-        up_left = [int(center[1]-half_mouth[1]), int(center[0]-half_mouth[0])]
-        down_right = [int(center[1]+half_mouth[1]), int(center[0]+half_mouth[0])]
-    return up_left, down_right
+DATA_DIR = sys.argv[1]
+IN_DIR = DATA_DIR  +  'data/'
+FACE_DIR = DATA_DIR + 'frontal/'
+REYE_DIR = DATA_DIR + 'reye/'
+LEYE_DIR = DATA_DIR  + 'leye/'
+MOUTH_DIR = DATA_DIR + 'mouth/'
+LMARK_DIR = DATA_DIR + 'lmark/'
+FLMARK_DIR = DATA_DIR + 'frontal_lmark/'
 
 
 if __name__ == '__main__':
     dir_names = [x for x in os.listdir(IN_DIR) if not x.startswith('.')]#facial_exp_list
-    error = open(DATA_DIR +  'error_list_test.txt', 'w')
-    fa = face_alignment.FaceAlignment(face_alignment.LandmarksType._3D, flip_input=False)
+    fa = face_alignment.FaceAlignment(face_alignment.LandmarksType._2D, flip_input=False)
     for d in dir_names:
         img_dir = IN_DIR + d + '/'
+        frontal_dir = FACE_DIR + d + '/'
         reye_dir = REYE_DIR + d + '/'
         leye_dir = LEYE_DIR + d + '/'
         mouth_dir = MOUTH_DIR + d + '/'
-        if os.path.exists(reye_dir) != True:
+        lmark_dir = LMARK_DIR + d + '/'
+        flmark_dir = FLMARK_DIR + d + '/'
+        if not os.path.exists(frontal_dir):
+            os.mkdir(frontal_dir)
+        if not os.path.exists(reye_dir):
             os.mkdir(reye_dir)
-        if os.path.exists(leye_dir) != True:
+        if not os.path.exists(leye_dir):
             os.mkdir(leye_dir)
-        if os.path.exists(mouth_dir) != True:
+        if not os.path.exists(mouth_dir):
             os.mkdir(mouth_dir)
+        if not os.path.exists(lmark_dir):
+            os.mkdir(lmark_dir)
+        if not os.path.exists(flmark_dir):
+            os.mkdir(flmark_dir)
 
         files = [x for x in os.listdir(img_dir) if not x.startswith('.')]#image list
         for f in files:
+            if os.path.exists(frontal_dir + os.path.basename(f)[:-4] + '.png'):
+                continue
+            print(img_dir + f)
             img = cv2.imread(img_dir + f)
-            preds = fa.get_landmarks(img)
-            if preds != None:
-                #############frontal_face = 
-                reye_ul, reye_dr = lmark_bbox(preds[0][36:42])
-                reye = img[reye_ul[0]:reye_dr[0], reye_ul[1]:reye_dr[1]]
-                cv2.imwrite(reye_dir + os.path.basename(f)[:-4] + '.jpg', reye)
+            preds = fa.get_landmarks(img_dir + f)
+            #preds = np.load('pred_alignment/'+d+'/'+ f[:-3] + 'npy')
+
+            if len(preds) > 0:
+                in_preds = copy.copy(preds[0][:,:2])
+                frontal, reye, leye, mouth, f_lmark = img_normalization(img, in_preds)
+
+                cv2.imwrite(frontal_dir + os.path.basename(f)[:-4] + '.png', frontal)
+                cv2.imwrite(reye_dir + os.path.basename(f)[:-4] + '.png', reye)
+                cv2.imwrite(leye_dir + os.path.basename(f)[:-4] + '.png', leye)
+                cv2.imwrite(mouth_dir + os.path.basename(f)[:-4] + '.png', mouth)
+
+                for i in range(len(preds[0])):
+                    cv2.circle(img, (preds[0][i][0], preds[0][i][1]), 2, (0, 0, 255), thickness=-1)
+                cv2.imwrite(lmark_dir + os.path.basename(f)[:-4] + '.png', img)
+                cv2.imwrite(flmark_dir + os.path.basename(f)[:-4] + '.png', f_lmark)
                 
-                leye_ul, leye_dr = lmark_bbox(preds[0][42:48])
-                leye = img[leye_ul[0]:leye_dr[0], leye_ul[1]:leye_dr[1]]
-                cv2.imwrite(leye_dir + os.path.basename(f)[:-4] + '.jpg', leye)
-                
-                mouth_ul, mouth_dr = lmark_bbox(preds[0][48:68], pos = 'mouth')
-                mouth = img[mouth_ul[0]:mouth_dr[0], mouth_ul[1]:mouth_dr[1]]
-                cv2.imwrite(mouth_dir + os.path.basename(f)[:-4] + '.jpg', mouth)
             else:
-                error.write(d + os.path.basename(f) + '\n')
-
-    error.close()
-
-
+                print('No face : ' + d + os.path.basename(f))

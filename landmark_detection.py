@@ -3,8 +3,14 @@ import numpy as np
 
 
 lmark_path = sys.argv[1]
+set_start = int(sys.argv[2])
+MIN_AREA = 200
+MAX_AREA = 1160
+
 org_lmarks =  np.load(lmark_path)
 
+start_pos = 60*set_start
+print('start from : ', start_pos)
 
 def lmarks_to_rect_area(lmarks):
     face_pos = []
@@ -22,7 +28,7 @@ def lmarks_to_rect_area(lmarks):
 
 out_lmarks = []
 for i, lmarks in enumerate(org_lmarks):
-    if len(lmarks) == 0:
+    if len(lmarks) == 0 or i < start_pos:
         out_lmarks.append([])
     else:
         if all(x==[] for x in out_lmarks):
@@ -49,7 +55,7 @@ for i, lmarks in enumerate(org_lmarks):
                     break
                 else:
                     target_id = np.argmin(prob_target)
-                    if face_posls[target_id][0]>300:
+                    if face_posls[target_id][0]>MAX_AREA and face_posls[target_id][0]<MIN_AREA:
                         prob_target = np.delete(prob_target, target_id)
                     else:
                         before_pos = np.array(face_posls[target_id])
